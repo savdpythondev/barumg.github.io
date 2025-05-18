@@ -11,6 +11,8 @@
             margin: 0 auto;
             padding: 20px;
             background-color: #f5f5f5;
+            position: relative;
+            min-height: 100vh;
         }
         .container {
             background-color: white;
@@ -34,9 +36,19 @@
         }
         .obzr-now {
             font-size: 24px;
-            color: #5cb85c;
+            color: #ff0000;
             font-weight: bold;
-            animation: blink 1s infinite;
+            text-transform: uppercase;
+            text-align: center;
+            animation: blink 0.5s infinite;
+            white-space: nowrap;
+            overflow: hidden;
+        }
+        .vacation {
+            font-size: 24px;
+            color: #f0ad4e;
+            font-weight: bold;
+            text-align: center;
         }
         button {
             background-color: #337ab7;
@@ -46,9 +58,17 @@
             border-radius: 4px;
             cursor: pointer;
             font-size: 16px;
+            margin-top: 10px;
         }
         button:hover {
             background-color: #286090;
+        }
+        .version {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            color: #999;
+            font-size: 12px;
         }
         @keyframes blink {
             0% { opacity: 1; }
@@ -66,6 +86,8 @@
         <h1>Статус ОБЗР:</h1>
         <div id="obzrTimer"></div>
     </div>
+
+    <div class="version">v1.1</div>
 
     <script>
         // Цитаты Бару
@@ -108,6 +130,19 @@
             "Ну давай. С чего рассказ называется?"
         ];
 
+        // Даты каникул (можно добавить нужные периоды)
+        const vacationPeriods = [
+            { start: new Date('2023-12-25'), end: new Date('2024-01-09') }, // Зимние каникулы
+            { start: new Date('2024-03-25'), end: new Date('2024-03-31') }, // Весенние каникулы
+            { start: new Date('2024-06-01'), end: new Date('2024-08-31') }  // Летние каникулы
+        ];
+
+        // Проверка, идет ли сейчас каникулы
+        function isVacationNow() {
+            const now = new Date();
+            return vacationPeriods.some(period => now >= period.start && now <= period.end);
+        }
+
         // Показать случайную цитату
         function showRandomQuote() {
             const randomIndex = Math.floor(Math.random() * baruQuotes.length);
@@ -116,34 +151,57 @@
 
         // Проверка ОБЗР
         function checkObzr() {
+            if (isVacationNow()) {
+                document.getElementById('obzrTimer').innerHTML = 
+                    '<div class="vacation">Сейчас каникулы!</div>';
+                return;
+            }
+
             const now = new Date();
             const day = now.getDay(); // 0 - воскресенье, 1 - понедельник, ..., 6 - суббота
             const hours = now.getHours();
             const minutes = now.getMinutes();
+            const seconds = now.getSeconds();
             
             // Проверяем, вторник ли сегодня и время ОБЗР (17:30-18:10)
-            if (day === 2 && hours === 17 && minutes >= 30 || 
-                day === 2 && hours === 18 && minutes < 10) {
-                document.getElementById('obzrTimer').innerHTML = 
-                    '<div class="obzr-now">Сейчас идёт ОБЗР!</div>';
-                return;
+            if (day === 2) {
+                if ((hours === 17 && minutes >= 30) || 
+                    (hours === 18 && minutes < 10)) {
+                    document.getElementById('obzrTimer').innerHTML = 
+                        '<div class="obzr-now">🚨 СЕЙЧАС ИДЁТ ОБЗР! 🚨</div>';
+                    return;
+                }
+                
+                // Если время ОБЗР уже прошло сегодня
+                if (hours > 18 || (hours === 18 && minutes >= 10)) {
+                    // Устанавливаем на следующий вторник
+                    const nextTuesday = new Date();
+                    nextTuesday.setDate(now.getDate() + (7 - day + 2) % 7);
+                    nextTuesday.setHours(17, 30, 0, 0);
+                    updateTimer(now, nextTuesday);
+                    return;
+                }
+                
+                // Если время ОБЗР еще не наступило сегодня
+                if (hours < 17 || (hours === 17 && minutes < 30)) {
+                    const todayObzr = new Date();
+                    todayObzr.setHours(17, 30, 0, 0);
+                    updateTimer(now, todayObzr);
+                    return;
+                }
             }
             
-            // Вычисляем время до следующего ОБЗР
-            let nextObzr = new Date();
-            
-            // Если сегодня вторник, но время уже прошло, или это среда-воскресенье
-            if (day > 2 || (day === 2 && (hours > 18 || (hours === 18 && minutes >= 10)))) {
-                // Устанавливаем на следующий вторник
-                const daysUntilTuesday = (9 - day) % 7;
-                nextObzr.setDate(now.getDate() + daysUntilTuesday);
-            }
-            
-            // Устанавливаем время 17:30
+            // Если сегодня не вторник
+            const daysUntilTuesday = (2 - day + 7) % 7;
+            const nextObzr = new Date();
+            nextObzr.setDate(now.getDate() + daysUntilTuesday);
             nextObzr.setHours(17, 30, 0, 0);
-            
-            // Разница в миллисекундах
-            const diff = nextObzr - now;
+            updateTimer(now, nextObzr);
+        }
+
+        // Обновление таймера
+        function updateTimer(now, target) {
+            const diff = target - now;
             
             // Преобразуем в дни, часы, минуты, секунды
             const days = Math.floor(diff / (1000 * 60 * 60 * 24));
